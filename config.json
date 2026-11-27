@@ -151,6 +151,11 @@
       "name": "充能轴2"
     },
     {
+      "comboWait": true,
+      "op": 2,
+      "who": "小刻"
+    },
+    {
       "key": "2",
       "hold": false,
       "op": 2,
@@ -360,7 +365,7 @@
   ],
   "teams": [
     {
-      "name": "提弗洛斯+小刻+诀（意）+梨诺 · 11-27 17:22",
+      "name": "提弗洛斯+小刻+诀（意）+梨诺 · 11-27 18:16",
       "team": [
         "提弗洛斯",
         "小刻",
@@ -460,6 +465,11 @@
         {
           "divider": true,
           "name": "充能轴2"
+        },
+        {
+          "comboWait": true,
+          "op": 2,
+          "who": "小刻"
         },
         {
           "key": "2",
@@ -671,8 +681,8 @@
   "winMax": false,
   "overlayMonitor": "\\\\.\\DISPLAY1",
   "winRect": {
-    "x": 0,
-    "y": 34,
+    "x": 55,
+    "y": 59,
     "w": 1818,
     "h": 972
   },
@@ -692,10 +702,10 @@
     "name": "operators_minghe.zip",
     "at": "2026-11-27 04:07"
   },
-  "overlayX": 383,
-  "overlayY": 4,
-  "heroX": 609,
-  "heroY": 356,
+  "overlayX": 390,
+  "overlayY": 144,
+  "heroX": 643,
+  "heroY": 334,
   "comboHintOn": 1,
   "comboHintMode": "WhenReady",
   "comboHintShowFor": 3.0,
