@@ -1,0 +1,985 @@
+diff --git a/app_web.py b/app_web.py
+index 2003c01..7e3ddb4 100644
+--- a/app_web.py
++++ b/app_web.py
+@@ -27,6 +27,230 @@ from urllib.parse import urlparse, parse_qs, unquote
+ 
+ BASE = os.path.dirname(os.path.abspath(__file__))
+ 
++# ---------- 界面风格 token：夜班变体（lime / neutral / plain / compact / calm） ----------
++# 颜色只在这里定一次，大蓝方框和技能轴都从这里取；强调色只标"当前/提醒"，不铺底。
++EF_PAPER = "#191919"       # 窗口纸面
++EF_PANEL = "#222222"       # 面板：蓝框、轴格
++EF_INK = "#EDEDED"         # 主文字
++EF_INK2 = "#A3A3A3"        # 眉标、次要文字
++EF_RULE = "#353535"        # 1px 细线
++EF_CHIP = "#2E2E2E"        # 静默填充（注释格）
++EF_SIGNAL = "#B8FF3D"      # 唯一强调色：当前位置 / 醒目提醒
++EF_ON_SIGNAL = "#161616"   # 强调色上的字
++
++
++def _ef_latin_family():
++    """注册打包的 Saira 宽体拉丁字；失败退回 Consolas，保证不在没字体时崩。"""
++    path = os.path.join(BASE, "assets", "Saira.ttf")
++    if os.path.exists(path):
++        try:
++            import ctypes
++            gdi = ctypes.WinDLL("gdi32")
++            gdi.AddFontResourceW.argtypes = [ctypes.c_wchar_p]
++            gdi.AddFontResourceW.restype = ctypes.c_int
++            if gdi.AddFontResourceW(path) > 0:
++                return "Saira"
++        except Exception:
++            pass
++    return "Consolas"
++
++
++EF_LATIN = _ef_latin_family()
++
++# 侧键 remapper 读取的「当前该按什么」状态文件（原子写，避免读到半截 JSON）
++SIDE_TARGET_FILE = os.path.join(os.environ.get("TEMP", BASE), "rotpilot_side_target.json")
++
++
++def write_side_target(key, hold=False):
++    """把当前步骤需要的键（1/2/3/4/E）写给 side_button_remapper。"""
++    try:
++        payload = {"key": str(key or "").strip().upper(), "hold": bool(hold),
++                   "t": time.time(), "pid": os.getpid()}
++        tmp = SIDE_TARGET_FILE + ".tmp"
++        with open(tmp, "w", encoding="utf-8") as f:
++            json.dump(payload, f)
++        os.replace(tmp, SIDE_TARGET_FILE)
++    except Exception:
++        pass
++
++
++def clear_side_target():
++    """运行条关掉后删掉状态，remapper 会退回原来的 1/2/3/4 循环。"""
++    try:
++        os.remove(SIDE_TARGET_FILE)
++    except Exception:
++        pass
++
++
++# ---------- 侧键直发（内置在同一个进程里，不用再开第二个脚本/终端） ----------
++import ctypes as _ct
++from ctypes import wintypes as _wt
++
++_WH_MOUSE_LL = 14
++_WH_KEYBOARD_LL = 13
++_WM_XBUTTONDOWN, _WM_XBUTTONUP = 0x020B, 0x020C
++_WM_KEYDOWN, _WM_KEYUP = 0x0100, 0x0101
++_WM_SYSKEYDOWN, _WM_SYSKEYUP = 0x0104, 0x0105
++_XBUTTON1 = 0x0001   # 下侧键（back）
++_XBUTTON2 = 0x0002   # 上侧键（forward），留着以后想换回去用
++_INPUT_KEYBOARD = 1
++_KEYEVENTF_KEYUP, _KEYEVENTF_SCANCODE = 0x0002, 0x0008
++
++_SIDE_VK = {"1": 0x31, "2": 0x32, "3": 0x33, "4": 0x34, "E": 0x45}
++_SIDE_SC = {0x31: 0x02, 0x32: 0x03, 0x33: 0x04, 0x34: 0x05, 0x45: 0x12}
++_SIDE_CYCLE = (0x31, 0x32, 0x33, 0x34)
++_SIDE_NAME = {0x31: "1", 0x32: "2", 0x33: "3", 0x34: "4", 0x45: "E"}
++
++
++class _KEYBDINPUT(_ct.Structure):
++    _fields_ = [("wVk", _wt.WORD), ("wScan", _wt.WORD), ("dwFlags", _wt.DWORD),
++                ("time", _wt.DWORD), ("dwExtraInfo", _ct.c_void_p)]
++
++
++class _MOUSEINPUT(_ct.Structure):
++    _fields_ = [("dx", _wt.LONG), ("dy", _wt.LONG), ("mouseData", _wt.DWORD),
++                ("dwFlags", _wt.DWORD), ("time", _wt.DWORD),
++                ("dwExtraInfo", _ct.c_void_p)]
++
++
++class _HARDWAREINPUT(_ct.Structure):
++    _fields_ = [("uMsg", _wt.DWORD), ("wParamL", _wt.WORD), ("wParamH", _wt.WORD)]
++
++
++class _INPUTUNION(_ct.Union):
++    _fields_ = [("mi", _MOUSEINPUT), ("ki", _KEYBDINPUT), ("hi", _HARDWAREINPUT)]
++
++
++class _INPUT(_ct.Structure):
++    _fields_ = [("type", _wt.DWORD), ("union", _INPUTUNION)]
++
++
++class _MSLLHOOKSTRUCT(_ct.Structure):
++    _fields_ = [("pt", _wt.POINT), ("mouseData", _wt.DWORD), ("flags", _wt.DWORD),
++                ("time", _wt.DWORD), ("dwExtraInfo", _ct.c_void_p)]
++
++
++class _KBDLLHOOKSTRUCT(_ct.Structure):
++    _fields_ = [("vkCode", _wt.DWORD), ("scanCode", _wt.DWORD),
++                ("flags", _wt.DWORD), ("time", _wt.DWORD),
++                ("dwExtraInfo", _ct.c_void_p)]
++
++
++class _MSG(_ct.Structure):
++    _fields_ = [("hwnd", _wt.HWND), ("message", _wt.UINT), ("wParam", _wt.WPARAM),
++                ("lParam", _wt.LPARAM), ("time", _wt.DWORD), ("pt", _wt.POINT)]
++
++
++_HOOKPROC = _ct.WINFUNCTYPE(_wt.LPARAM, _ct.c_int, _wt.WPARAM, _wt.LPARAM)
++# 用独立 DLL 实例：别改 windll.user32 的全局 argtypes，rawpad 也在用同一个对象
++_user32 = _ct.WinDLL("user32")
++_kernel32 = _ct.WinDLL("kernel32")
++_user32.SetWindowsHookExW.argtypes = [_ct.c_int, _HOOKPROC, _wt.HINSTANCE, _wt.DWORD]
++_user32.SetWindowsHookExW.restype = _ct.c_void_p
++_user32.CallNextHookEx.argtypes = [_ct.c_void_p, _ct.c_int, _wt.WPARAM, _wt.LPARAM]
++_user32.CallNextHookEx.restype = _wt.LPARAM
++_user32.SendInput.argtypes = [_wt.UINT, _ct.POINTER(_INPUT), _ct.c_int]
++_user32.SendInput.restype = _wt.UINT
++_user32.UnhookWindowsHookEx.argtypes = [_ct.c_void_p]
++_user32.GetMessageW.argtypes = [_ct.POINTER(_MSG), _wt.HWND, _wt.UINT, _wt.UINT]
++_user32.GetMessageW.restype = _wt.LPARAM
++_user32.TranslateMessage.argtypes = [_ct.POINTER(_MSG)]
++_user32.DispatchMessageW.argtypes = [_ct.POINTER(_MSG)]
++_user32.PostQuitMessage.argtypes = [_ct.c_int]
++_kernel32.GetModuleHandleW.argtypes = [_wt.LPCWSTR]
++_kernel32.GetModuleHandleW.restype = _wt.HINSTANCE
++
++
++class SideKeyHook:
++    """独立线程装 WH_MOUSE_LL：侧键按下就发轴当前需要的键。
++
++    get_target() 返回运行条当前的 _side_key；轴没跑或该步没有键时返回空串，
++    此时退回原来的 1/2/3/4 循环，保证单独按侧键也还有用。
++    """
++
++    def __init__(self, get_target, watch=_XBUTTON1, swallow=True):
++        self.get_target = get_target
++        self.watch = watch
++        self.swallow = swallow
++        self.active_vk = None
++        self.hook = None
++        self.cb_ref = None
++        self.cycle = 0
++        self.stop_req = False
++
++    def _resolve(self):
++        """当前轴要的键；没有就退回 1/2/3/4 循环。"""
++        try:
++            key = str(self.get_target() or "").strip().upper()
++        except Exception:
++            key = ""
++        vk = _SIDE_VK.get(key)
++        if vk:
++            return vk, "轴"
++        vk = _SIDE_CYCLE[self.cycle % len(_SIDE_CYCLE)]
++        self.cycle += 1
++        return vk, "循环"
++
++    def _send_key(self, vk, down):
++        inp = _INPUT()
++        inp.type = _INPUT_KEYBOARD
++        inp.union.ki.wScan = _SIDE_SC.get(vk, 0)
++        inp.union.ki.dwFlags = ((0 if down else _KEYEVENTF_KEYUP)
++                                | _KEYEVENTF_SCANCODE)
++        _user32.SendInput(1, _ct.byref(inp), _ct.sizeof(_INPUT))
++
++    def _callback(self, nCode, wParam, lParam):
++        try:
++            if nCode >= 0 and wParam in (_WM_XBUTTONDOWN, _WM_XBUTTONUP):
++                info = _ct.cast(lParam, _ct.POINTER(_MSLLHOOKSTRUCT)).contents
++                if ((info.mouseData >> 16) & 0xFFFF) == self.watch:
++                    if wParam == _WM_XBUTTONDOWN:
++                        vk, src = self._resolve()
++                        self.active_vk = vk
++                        self._send_key(vk, True)
++                        log("side down -> %s [%s]" % (_SIDE_NAME.get(vk, "?"), src))
++                    else:
++                        if self.active_vk is not None:
++                            self._send_key(self.active_vk, False)
++                            self.active_vk = None
++                    if self.swallow:
++                        return 1
++        except Exception as e:
++            log("side hook err %s" % e)
++        return _user32.CallNextHookEx(self.hook, nCode, wParam, lParam)
++
++    def run(self):
++        try:
++            self.cb_ref = _HOOKPROC(self._callback)
++            self.hook = _user32.SetWindowsHookExW(
++                _WH_MOUSE_LL, self.cb_ref, _kernel32.GetModuleHandleW(None), 0)
++            if not self.hook:
++                log("side hook failed err=%d" % _ct.get_last_error())
++                return
++            log("side hook ready on XBUTTON1 (overlay key, fallback 1/2/3/4)")
++            msg = _MSG()
++            while not self.stop_req:
++                ret = _user32.GetMessageW(_ct.byref(msg), None, 0, 0)
++                if ret <= 0:
++                    break
++                _user32.TranslateMessage(_ct.byref(msg))
++                _user32.DispatchMessageW(_ct.byref(msg))
++        except Exception as e:
++            log("side hook loop err %s" % e)
++        finally:
++            if self.hook:
++                _user32.UnhookWindowsHookEx(self.hook)
++                self.hook = None
++            if self.active_vk is not None:
++                self._send_key(self.active_vk, False)
++                self.active_vk = None
++            log("side hook stopped")
++
++    def stop(self):
++        self.stop_req = True
++        _user32.PostQuitMessage(0)
++
++
+ # ---------- GitHub 更新 ----------
+ UPDATE_REPO = "HermesStar37/EndfieldRotPilot"
+ UPDATE_API = os.environ.get("ROTPILOT_UPDATE_API", "https://api.github.com")
+@@ -442,6 +666,9 @@ def update_apply():
+ APP_VERSION = "v1.4.1"
+ APP_BUILD = "2026-10-26"
+ 
++# 本地定制补丁标记（官方更新会覆盖本文件，一键脚本靠这个判断是否已打补丁）
++LOCAL_CUSTOM_VERSION = "2026-11-27.8"
++
+ 
+ # 素材与图标函数：优先用本目录下的 core（自带，独立运行）
+ CORE_DIR = os.path.join(BASE, "core")     # 自带，全部东西都在本目录
+@@ -1625,6 +1852,10 @@ class Overlay:
+         except Exception:
+             self.screen_idx = 0
+         self.auto_follow = True
++        # 侧键 remapper 的当前目标键（1/2/3/4/E），由 _paint_hero 更新
++        self._side_key = ""
++        self._side_hold = False
++        self._side_at = 0.0
+         self.steps = steps
+         self.team = team
+         self.hold_ms = hold_ms
+@@ -1635,6 +1866,11 @@ class Overlay:
+         except Exception:
+             self.scale = 1.0
+         self.icon_px = max(16, int(round(self.icon_size * self.scale)))
++        # 左侧「当前该按什么」大方框：略大于两个图标宽，最小 96px
++        self.hero_px = max(96, int(round(self.icon_px * 2.2)))
++        # 高度比宽度多留一点，给眉标/动作/步数让位，图标才不会被挤裁
++        self.hero_h = self.hero_px + max(12, int(round(self.icon_px * 0.27)))
++        self.hero_icon_px = max(40, int(round(self.hero_h * 0.40)))
+         self.next_preview = bool(next_preview)
+         self.ghosts = []
+         self.pos_x = pos_x
+@@ -1685,9 +1921,58 @@ class Overlay:
+         self.root.overrideredirect(True)
+         self.root.attributes("-topmost", True)
+         self.root.attributes("-alpha", self._alpha)
+-        self.root.configure(bg="#0d1117")
+-
+-        self.frame = tk.Frame(self.root, bg="#0d1117", padx=14, pady=12)
++        self.root.configure(bg=EF_PAPER)
++
++        # 左侧提示框是独立窗口：不再把技能条撑高，也不跟着技能条一起重绘
++        self.hero_root = tk.Toplevel(self.root)
++        self.hero_root.overrideredirect(True)
++        self.hero_root.attributes("-topmost", True)
++        self.hero_root.attributes("-alpha", self._alpha)
++        self.hero_root.configure(bg=EF_PAPER)
++        self.hero_frame = tk.Frame(self.hero_root, bg=EF_PAPER,
++                                   padx=self._p(3), pady=self._p(3))
++        self.hero_frame.pack()
++        box = tk.Frame(self.hero_frame, width=self.hero_px, height=self.hero_h,
++                       bg=EF_PANEL, bd=0)
++        box.pack(side="top", anchor="center")
++        box.pack_propagate(False)
++        # 左侧 4px trace：强调色只标"当前"，不铺底
++        trace = tk.Frame(box, width=self._p(4), bg=EF_SIGNAL)
++        trace.pack(side="left", fill="y")
++        inner = tk.Frame(box, bg=EF_PANEL)
++        inner.pack(side="left", fill="both", expand=True)
++        # 眉标行：只放宽体大写英文
++        head = tk.Frame(inner, bg=EF_PANEL)
++        head.pack(side="top", fill="x")
++        eyebrow = tk.Label(head, text="// NOW", bg=EF_PANEL, fg=EF_INK2,
++                           font=(EF_LATIN, self._f(11), "bold"))
++        eyebrow.pack(side="left", padx=(self._p(6), 0), pady=(self._p(2), 0))
++        # 步数先贴底、动作再贴其上，图标行最后占中间；按键数字仍不显示
++        step_lb = tk.Label(inner, text="", bg=EF_PANEL, fg=EF_INK2,
++                           font=(EF_LATIN, self._f(10)))
++        step_lb.pack(side="bottom", pady=(0, self._p(2)))
++        tag_lb = tk.Label(inner, text="", bg=EF_PANEL, fg=EF_INK,
++                          font=("Microsoft YaHei UI", self._f(11), "bold"))
++        tag_lb.pack(side="bottom", pady=(0, self._p(1)))
++        # 重击角标与图标同一行：有重击时放在图标左侧
++        mid = tk.Frame(inner, bg=EF_PANEL)
++        mid.pack(side="top", fill="both", expand=True)
++        heavy_lb = tk.Label(mid, text="", bg=EF_SIGNAL, fg=EF_ON_SIGNAL,
++                            font=("Microsoft YaHei UI", self._f(10), "bold"))
++        pic_lb = tk.Label(mid, bg=EF_PANEL)
++        pic_lb.pack(side="left", expand=True)
++        # 备注：醒目提醒用强调色填充 + 墨字；没有备注时整块收起
++        note_wrap = self.hero_px + self._p(60)
++        note_lb = tk.Label(self.hero_frame, text="", bg=EF_SIGNAL, fg=EF_ON_SIGNAL,
++                           font=("Microsoft YaHei UI", self._f(10), "bold"),
++                           wraplength=note_wrap, justify="center")
++        self.hero = {"root": self.hero_root, "box": box, "pic": pic_lb,
++                     "tag": tag_lb, "heavy": heavy_lb, "note": note_lb,
++                     "step": step_lb, "head": head, "mid": mid}
++        self._bind_hero_drag(self.hero_frame)
++        self.hero_root.bind("<Button-3>", self._menu)
++
++        self.frame = tk.Frame(self.root, bg=EF_PAPER, padx=14, pady=12)
+         self.frame.pack()
+ 
+         self.cells = []
+@@ -1695,6 +1980,7 @@ class Overlay:
+         self._dy = 0
+         self._build()
+         self._place()
++        self._place_hero()
+         self._bind_drag(self.frame)
+         self.frame.bind("<Button-3>", self._menu)
+         self.root.bind("<Button-3>", self._menu)
+@@ -1788,18 +2074,24 @@ class Overlay:
+         try:
+             if not self.running:
+                 return
+-            try:
+-                self.root.attributes("-topmost", True)
+-            except Exception:
+-                pass
++            for win in (self.root, getattr(self, "hero_root", None)):
++                if win is None:
++                    continue
++                try:
++                    win.attributes("-topmost", True)
++                except Exception:
++                    pass
+             if tick % 2 == 0:
+                 try:
+                     u = ctypes.windll.user32
+-                    hwnd = u.GetParent(self.root.winfo_id()) or self.root.winfo_id()
+                     HWND_TOPMOST = -1
+                     SWP_NOMOVE, SWP_NOSIZE, SWP_NOACTIVATE = 0x0002, 0x0001, 0x0010
+-                    u.SetWindowPos(hwnd, HWND_TOPMOST, 0, 0, 0, 0,
+-                                   SWP_NOMOVE | SWP_NOSIZE | SWP_NOACTIVATE)
++                    for win in (self.root, getattr(self, "hero_root", None)):
++                        if win is None:
++                            continue
++                        hwnd = u.GetParent(win.winfo_id()) or win.winfo_id()
++                        u.SetWindowPos(hwnd, HWND_TOPMOST, 0, 0, 0, 0,
++                                       SWP_NOMOVE | SWP_NOSIZE | SWP_NOACTIVATE)
+                 except Exception:
+                     pass
+             if tick % 3 == 0:
+@@ -1835,6 +2127,83 @@ class Overlay:
+         """间距跟着整体缩放走。"""
+         return max(2, int(round(px * self.scale)))
+ 
++    def _key_label(self, s):
++        """给左侧大方框用：返回 (大字按键, 小字动作)。"""
++        if not isinstance(s, dict):
++            return "", ""
++        if self._is_note_only(s):
++            return "注", "注释"
++        if s.get("heavy"):
++            return "重", "重击（自动）"
++        op = int(s.get("op", 1) or 1)
++        is_link = str(s.get("key") or "").upper() == "E"
++        if self.display_mode == "pad":
++            slots = (self.pad or {}).get("slots") or []
++            sym = _pad_label(slots[op - 1]) if 0 < op <= len(slots) else str(op)
++            if is_link:
++                return (_pad_label((self.pad or {}).get("link")) or "连携"), "连携"
++            if s.get("hold"):
++                return sym, "终结技"
++            return sym, "战技"
++        raw_key = str(s.get("key") or "").strip()
++        k_skill = raw_key or (self.keys["skill"][op - 1] if 0 < op <= 4 else str(op))
++        if is_link:
++            return (raw_key or self.keys["link"] or "E"), "连携"
++        if s.get("hold"):
++            cfg_ult = self.keys["ult"][op - 1] if 0 < op <= 4 else ""
++            bound = bool(cfg_ult) and (not raw_key or raw_key == cfg_ult)
++            return (raw_key or cfg_ult or k_skill), ("终结技" if bound else "长按终结")
++        return k_skill, "战技"
++
++    def _compact_key(self, s):
++        """大方框里的短按键记号：长按没单独绑终结键时写成「长2」。"""
++        big, small = self._key_label(s)
++        if isinstance(s, dict) and s.get("hold") and "长按" in small:
++            return "长" + big
++        return big
++
++    def _step_icon_tag(self, s):
++        """和轴表格子保持一致：返回这一步的 (图标路径, 格下文字)。"""
++        if not isinstance(s, dict):
++            return None, ""
++        if self._is_note_only(s):
++            return None, "注释"
++        heavy = bool(s.get("heavy"))
++        kind = "heavy" if heavy else ("ult" if s.get("hold") else
++                                      ("link" if str(s.get("key") or "").upper() == "E" else "skill"))
++        op = int(s.get("op", 1) or 1)
++        who = self.team[op - 1] if 0 < op <= len(self.team) else ""
++        try:
++            src = (core.icon("heavy", core.ELEMENT_COLORS.get("物理", (110, 114, 120)),
++                             "", "", badge=False)
++                   if heavy else op_icon_png(who, kind, s.get("hold"), op))
++        except Exception:
++            src = None
++        if self.display_mode == "pad":
++            slots = (self.pad or {}).get("slots") or []
++            sym = _pad_label(slots[op - 1]) if 0 < op <= len(slots) else ""
++            link_key = _pad_label((self.pad or {}).get("link"))
++            if heavy:
++                tag = "重击"
++            elif kind == "link":
++                tag = ("%s连携" % (link_key or "连携"))
++            elif s.get("hold"):
++                tag = ("长按%s终结" % (sym or op))
++            else:
++                tag = ("%s战技" % (sym or op))
++        else:
++            k_skill = self.keys["skill"][op - 1] if 0 < op <= 4 else str(op)
++            k_ult = self.keys["ult"][op - 1] if 0 < op <= 4 else ""
++            if heavy:
++                tag = "重击"
++            elif kind == "link":
++                tag = "%s连携" % self.keys["link"]
++            elif s.get("hold"):
++                tag = ("%s终结" % k_ult) if k_ult else ("长按%s终结" % k_skill)
++            else:
++                tag = "%s战技" % k_skill
++        return src, tag
++
+     def _photo(self, src, dim=False, size=None):
+         """带缓存的 PhotoImage；dim=True 返回压暗版。"""
+         from PIL import Image, ImageTk, ImageEnhance
+@@ -1885,7 +2254,7 @@ class Overlay:
+         seg_name, steps = self.segments[self.seg] if self.segments else ("", [])
+         if True:
+             tag = seg_name or f"第 {self.seg + 1} 段"
+-            lab = self.tk.Label(self.frame, text=tag, bg="#0d1117", fg="#ffd400",
++            lab = self.tk.Label(self.frame, text=tag, bg=EF_PAPER, fg=EF_INK,
+                                 font=("Microsoft YaHei UI", self._f(9), "bold"))
+             lab.pack(side="left", padx=(0, self._p(10)))
+             self._tag_lb = lab          # 循环 / 透明度提示会临时借用这一格
+@@ -1895,52 +2264,48 @@ class Overlay:
+                 continue
+             if s.get("divider"):
+                 lab = self.tk.Label(self.frame, text="｜" + (s.get("name") or "分段"),
+-                                    bg="#0d1117", fg="#7d8590",
++                                    bg=EF_PAPER, fg=EF_INK2,
+                                     font=("Microsoft YaHei UI", self._f(8)))
+                 lab.pack(side="left", padx=self._p(6))
+                 continue
+             if self._is_note_only(s):
+-                col = self.tk.Frame(self.frame, bg="#0d1117")
++                col = self.tk.Frame(self.frame, bg=EF_PAPER)
+                 col.pack(side="left", padx=self._p(5), anchor="s")
+-                nl = self.tk.Label(col, text=(s.get("note") or "")[:28], bg="#0d1117",
+-                                   fg="#7fa6d0", font=("Microsoft YaHei UI", self._f(8)),
++                nl = self.tk.Label(col, text=(s.get("note") or "")[:28], bg=EF_PAPER,
++                                   fg=EF_INK2, font=("Microsoft YaHei UI", self._f(8)),
+                                    wraplength=self._p(104), justify="center")
+                 nl.pack(side="top", pady=(0, self._p(3)))
+-                cell = self.tk.Frame(col, bg="#0d1117")
++                cell = self.tk.Frame(col, bg=EF_PAPER)
+                 cell.pack(side="top")
+-                chip = self.tk.Label(cell, text="注", bg="#161b22", fg="#8b949e",
++                chip = self.tk.Label(cell, text="注", bg=EF_CHIP, fg=EF_INK2,
+                                      width=3, height=2,
+                                      font=("Microsoft YaHei UI", self._f(10), "bold"))
+                 chip.pack()
+-                num = self.tk.Label(cell, text="注释", bg="#0d1117", fg="#6b7280",
++                num = self.tk.Label(cell, text="注释", bg=EF_PAPER, fg=EF_INK2,
+                                     font=("Microsoft YaHei UI", self._f(8)))
+                 num.pack()
+                 self.cells.append({"cell": cell, "pic": chip, "num": num, "col": col,
+                                    "note": None, "img": None, "img_dim": None})
+                 continue
+-            heavy = bool(s.get("heavy"))
+-            kind = "heavy" if heavy else ("ult" if s.get("hold") else ("link" if str(s.get("key")).upper() == "E" else "skill"))
+-            op = int(s.get("op", 1) or 1)
+-            who = self.team[op - 1] if 0 < op <= len(self.team) else ""
+-            try:
+-                src = (core.icon("heavy", core.ELEMENT_COLORS.get("物理", (110, 114, 120)),
+-                                 "", "", badge=False)
+-                       if heavy else op_icon_png(who, kind, s.get("hold"), op))
+-                ph = self._photo(src)
+-            except Exception:
+-                ph = None
+-            col = self.tk.Frame(self.frame, bg="#0d1117")
++            src, tag = self._step_icon_tag(s)
++            ph = None
++            if src:
++                try:
++                    ph = self._photo(src)
++                except Exception:
++                    ph = None
++            col = self.tk.Frame(self.frame, bg=EF_PAPER)
+             col.pack(side="left", padx=self._p(5), anchor="s")
+             note = s.get("note") or ""
+             note_lb = None
+             if note:
+-                note_lb = self.tk.Label(col, text=note, bg="#0d1117", fg="#7fa6d0",
++                note_lb = self.tk.Label(col, text=note, bg=EF_PAPER, fg=EF_INK2,
+                                         font=("Microsoft YaHei UI", self._f(8)),
+                                         wraplength=self._p(104), justify="center")
+                 note_lb.pack(side="top", pady=(0, self._p(3)))
+-            cell = self.tk.Frame(col, bg="#0d1117")
++            cell = self.tk.Frame(col, bg=EF_PAPER)
+             cell.pack(side="top")
+-            pic = self.tk.Label(cell, bg="#0d1117")
++            pic = self.tk.Label(cell, bg=EF_PAPER)
+             ph_dim = None
+             if ph:
+                 pic.config(image=ph)
+@@ -1951,33 +2316,7 @@ class Overlay:
+                     except Exception:
+                         ph_dim = None
+             pic.pack()
+-            # 下面这行字：1战技 / 连携 / 1终结
+-            k_skill = self.keys["skill"][op - 1] if 0 < op <= 4 else str(op)
+-            k_ult = self.keys["ult"][op - 1] if 0 < op <= 4 else ""
+-
+-            if self.display_mode == "pad":
+-                slots = (self.pad or {}).get("slots") or []
+-                sym = _pad_label(slots[op - 1]) if 0 < op <= len(slots) else ""
+-                mod = _pad_label((self.pad or {}).get("modifier"))
+-                link_key = _pad_label((self.pad or {}).get("link"))
+-                if heavy:
+-                    tag = "重击"
+-                elif kind == "link":
+-                    tag = ("%s连携" % (link_key or "连携"))
+-                elif s.get("hold"):
+-                    tag = ("长按%s终结" % (sym or op))
+-                else:
+-                    tag = ("%s战技" % (sym or op))
+-            else:
+-                if heavy:
+-                    tag = "重击"
+-                elif kind == "link":
+-                    tag = "%s连携" % self.keys["link"]
+-                elif s.get("hold"):
+-                    tag = ("%s终结" % k_ult) if k_ult else ("长按%s终结" % k_skill)
+-                else:
+-                    tag = "%s战技" % k_skill
+-            num = self.tk.Label(cell, text=tag, bg="#0d1117", fg="#6b7280",
++            num = self.tk.Label(cell, text=tag, bg=EF_PAPER, fg=EF_INK2,
+                                 font=("Microsoft YaHei UI", self._f(8)))
+             num.pack()
+             self.cells.append({"cell": cell, "pic": pic, "num": num, "col": col,
+@@ -1986,11 +2325,11 @@ class Overlay:
+         self.ghosts = []
+         if self.next_preview:
+             for _k in range(2):
+-                gc = self.tk.Frame(self.frame, bg="#0d1117")
++                gc = self.tk.Frame(self.frame, bg=EF_PAPER)
+                 gc.pack(side="left", padx=self._p(4), anchor="s")
+-                gp = self.tk.Label(gc, bg="#0d1117")
++                gp = self.tk.Label(gc, bg=EF_PAPER)
+                 gp.pack()
+-                gt = self.tk.Label(gc, text="", bg="#0d1117", fg="#3a4048",
++                gt = self.tk.Label(gc, text="", bg=EF_PAPER, fg="#5C5C5C",
+                                    font=("Microsoft YaHei UI", self._f(7)))
+                 gt.pack()
+                 self.ghosts.append({"col": gc, "pic": gp, "num": gt})
+@@ -2055,6 +2394,80 @@ class Overlay:
+             except Exception:
+                 pass
+ 
++    def _paint_hero(self, steps, follow):
++        """刷新左侧大方框：直接用当前轴表的图标 + 格下文字，重击只留「重」角标。"""
++        h = getattr(self, "hero", None)
++        if not h:
++            return
++        try:
++            if not steps:
++                h["pic"].config(image="", text="")
++                h["pic"].image = None
++                h["tag"].config(text="")
++                h["step"].config(text="")
++                h["heavy"].config(text="")
++                h["heavy"].pack_forget()
++                h["note"].pack_forget()
++                self._side_key, self._side_hold = "", False
++                write_side_target("")
++                return
++            i = self.idx if 0 <= self.idx < len(steps) else len(steps) - 1
++            # 重击/纯注释是被动格，真正要按的是它后面第一个技能
++            cur_i = i
++            if steps[i].get("heavy") or self._is_note_only(steps[i]):
++                nxt = follow.get(i)
++                if nxt is not None and 0 <= nxt < len(steps):
++                    cur_i = nxt
++            s = steps[cur_i]
++            # 当前高亮里跟着几个重击 → 角标写「重」或「重*2」
++            heavy_n = 0
++            for j in range(0, cur_i + 1):
++                if not steps[j].get("heavy"):
++                    continue
++                fj = follow.get(j)
++                if j == i or j == cur_i or (fj is not None and fj == cur_i):
++                    heavy_n += 1
++            token = self._compact_key(s) or "—"
++            # 侧键 remapper 仍按实际要按的键发，界面不显示数字了而已
++            side_key = token[1:] if token.startswith("长") else token
++            side_key = side_key.strip().upper()
++            if side_key not in ("1", "2", "3", "4", "E"):
++                side_key = ""
++            self._side_key, self._side_hold = side_key, bool(s.get("hold"))
++            self._side_at = time.time()
++            write_side_target(side_key, self._side_hold)
++            src, tag = self._step_icon_tag(s)
++            ph = None
++            if src:
++                try:
++                    ph = self._photo(src, size=self.hero_icon_px)
++                except Exception:
++                    ph = None
++            if ph:
++                h["pic"].config(image=ph, text="")
++                h["pic"].image = ph
++            else:
++                h["pic"].config(image="", text="—")
++                h["pic"].image = None
++            h["tag"].config(text=tag)
++            # 真实步数：当前步 / 本段总步数（不是假的装饰数字）
++            h["step"].config(text="%02d / %02d" % (min(i + 1, len(steps)), len(steps)))
++            if heavy_n:
++                h["heavy"].config(text=("重" if heavy_n == 1 else "重*%d" % heavy_n))
++                h["heavy"].pack(side="left", before=h["pic"],
++                                padx=(self._p(2), self._p(2)))
++            else:
++                h["heavy"].config(text="")
++                h["heavy"].pack_forget()
++            note = s.get("note") or ""
++            if note:
++                h["note"].config(text=("备注：" + note))
++                h["note"].pack(side="top", fill="x", pady=(self._p(4), 0))
++            else:
++                h["note"].pack_forget()
++        except Exception as e:
++            log("paint hero fail %s" % e)
++
+     def _paint(self):
+         style = self.overlay_style
+         dim_others = style in ("focus", "both")
+@@ -2070,10 +2483,11 @@ class Overlay:
+                 follow[i] = i
+ 
+         self._paint_ghosts(steps)
++        self._paint_hero(steps, follow)
+ 
+         for i, c in enumerate(self.cells):
+             on = (i == self.idx) or (follow.get(i) == self.idx and follow.get(i) is not None)
+-            bg = "#1f6feb" if (on and blue_box) else "#0d1117"
++            bg = EF_SIGNAL if (on and blue_box) else EF_PAPER
+             c["cell"].config(bg=bg)
+             c["pic"].config(bg=bg)
+             if dim_others and c.get("img") is not None:
+@@ -2081,11 +2495,11 @@ class Overlay:
+                 c["pic"].config(image=img)
+                 c["pic"].image = img
+             c["num"].config(bg=bg,
+-                            fg=("#ffffff" if (on and blue_box) else ("#5a6068" if dim_others and not on else "#484f58")))
++                            fg=(EF_ON_SIGNAL if (on and blue_box) else (EF_INK2 if dim_others and not on else EF_INK2)))
+             try:
+                 c["col"].config(bg=bg)
+                 if c.get("note") is not None:
+-                    c["note"].config(bg=bg, fg="#ffffff" if on else "#7fa6d0")
++                    c["note"].config(bg=bg, fg=EF_ON_SIGNAL if on else EF_INK2)
+             except Exception:
+                 pass
+ 
+@@ -2100,6 +2514,46 @@ class Overlay:
+         except Exception:
+             pass
+ 
++    def _bind_hero_drag(self, w):
++        """独立提示框自己拖自己的，不影响技能条。"""
++        try:
++            w.bind("<Button-1>", self._hero_drag_start)
++            w.bind("<B1-Motion>", self._hero_drag_move)
++            w.bind("<ButtonRelease-1>", lambda e: self._save_hero_pos())
++            for c in w.winfo_children():
++                self._bind_hero_drag(c)
++        except Exception:
++            pass
++
++    def _hero_drag_start(self, e):
++        try:
++            self._hdx = e.x_root - self.hero_root.winfo_x()
++            self._hdy = e.y_root - self.hero_root.winfo_y()
++        except Exception:
++            pass
++
++    def _hero_drag_move(self, e):
++        try:
++            self.hero_root.geometry(f"+{e.x_root - self._hdx}+{e.y_root - self._hdy}")
++        except Exception:
++            pass
++
++    def _save_hero_pos(self):
++        """提示框松手后单独记位置。"""
++        try:
++            mons = enum_monitors(force=True)
++            idx = getattr(self, "screen_idx", 0)
++            mon = mons[idx] if 0 <= idx < len(mons) else mons[0]
++            x = self.hero_root.winfo_x()
++            y = self.hero_root.winfo_y() - mon["rect"][1]
++            cfg = load_cfg()
++            cfg["heroX"] = int(x)
++            cfg["heroY"] = int(max(0, y))
++            save_cfg(cfg)
++            log("hero pos saved %s,%s (%s)" % (int(x), int(max(0, y)), mon["name"]))
++        except Exception as e:
++            log("hero save pos fail %s" % e)
++
+     def _drag_start(self, e):
+         try:
+             self._dx = e.x_root - self.root.winfo_x()
+@@ -2151,6 +2605,32 @@ class Overlay:
+         y = t + max(0, int(self.pos_y))
+         y = max(t, min(y, max(t, b - h)))
+         self.root.geometry(f"{w}x{h}+{x}+{y}")
++        self._place_hero()
++
++    def _place_hero(self):
++        """提示框默认贴在技能条左边；拖过之后就用自己记下的位置。"""
++        try:
++            self.hero_root.update_idletasks()
++            w = self.hero_frame.winfo_reqwidth()
++            h = self.hero_frame.winfo_reqheight()
++            mons = enum_monitors()
++            idx = getattr(self, "screen_idx", 0)
++            if not (0 <= idx < len(mons)):
++                idx = pick_screen()
++            l, t, r, b = mons[idx]["work"]
++            cfg = load_cfg()
++            hx, hy = cfg.get("heroX"), cfg.get("heroY")
++            if hx is None or hy is None or int(hx) < 0:
++                x = self.root.winfo_x() - w - self._p(6)
++                y = self.root.winfo_y()
++            else:
++                x, y = int(hx), t + int(hy)
++            x = max(l, min(x, max(l, r - w)))
++            y = max(t, min(y, max(t, b - h)))
++            # 只定位置，尺寸让内容自适应；备注块是运行时才 pack，写死高度会把它裁掉
++            self.hero_root.geometry(f"+{x}+{y}")
++        except Exception as e:
++            log("hero place fail %s" % e)
+ 
+     def set_screen(self, idx):
+         """换屏：保持水平相对位置、纵向仍按“距顶部”算，然后重摆。"""
+@@ -2317,6 +2797,11 @@ class Overlay:
+                     log("handle error %s %s: %s" % (kind, name, e))
+         except queue.Empty:
+             pass
++        # 侧键状态心跳：remapper 靠时间戳判断轴还在跑，停在同一步也要续命
++        if self.running and time.time() - getattr(self, "_side_at", 0) >= 1.0:
++            write_side_target(getattr(self, "_side_key", ""),
++                              getattr(self, "_side_hold", False))
++            self._side_at = time.time()
+         if self.running:
+             self.root.after(30, self._tick)
+ 
+@@ -2630,7 +3115,7 @@ class Overlay:
+ 
+         def back():
+             try:
+-                lb.config(text=self._tag_text, fg="#ffd400")
++                lb.config(text=self._tag_text, fg=EF_INK)
+             except Exception:
+                 pass
+             self._tag_job = None
+@@ -2642,10 +3127,13 @@ class Overlay:
+     # ---- 透明度（外部 HTTP 调用也走这里，线程安全） ----
+     def _apply_alpha(self, v):
+         self._alpha = clamp_alpha(v)
+-        try:
+-            self.root.attributes("-alpha", self._alpha)
+-        except Exception:
+-            pass
++        for win in (self.root, getattr(self, "hero_root", None)):
++            if win is None:
++                continue
++            try:
++                win.attributes("-alpha", self._alpha)
++            except Exception:
++                pass
+ 
+     def push_alpha(self, v):
+         """给 HTTP 线程用：排到 Tk 线程里改，别跨线程动窗口。"""
+@@ -2820,6 +3308,7 @@ class Overlay:
+         except Exception:
+             pass
+         self.running = False
++        clear_side_target()
+         try:
+             import keyboard
+             keyboard.unhook_all()
+@@ -2829,6 +3318,12 @@ class Overlay:
+             self.root.quit()          # 先停主循环，避免 destroy 之后 after 回调报错
+         except Exception:
+             pass
++        try:
++            hr = getattr(self, "hero_root", None)
++            if hr is not None:
++                hr.destroy()
++        except Exception:
++            pass
+         try:
+             self.root.destroy()
+         except Exception:
+@@ -2970,6 +3465,106 @@ def start_overlay(cfg):
+     return True
+ 
+ 
++# 小键盘快捷键：低级键盘钩子（WH_KEYBOARD_LL），事件驱动。
++# 之前用 GetAsyncKeyState 轮询，游戏抢前台后轮询线程收不到按键（实测第 2 轮
++# 之后就失灵），改成和侧键一样的钩子，任何窗口前台都能捕获。
++_NUMPAD_RUN = 0x61      # NumLock 开：小键盘 1
++_NUMPAD_STOP = 0x62     # NumLock 开：小键盘 2
++_NUMPAD_END = 0x23      # NumLock 关：小键盘 1 = End
++_NUMPAD_DOWN = 0x28     # NumLock 关：小键盘 2 = ↓
++
++
++class NumpadHook:
++    """小键盘 1 = 开始运行，小键盘 2 = 停止运行。
++
++    全局低级键盘钩子，运行条没起来时也能按 1 启动；NumLock 开/关都识别
++    （关时小键盘 1/2 变成 End/↓，靠扩展键标志区分主键盘与小键盘）。
++    """
++
++    def __init__(self):
++        self.hook = None
++        self.cb_ref = None
++        self.stop_req = False
++
++    @staticmethod
++    def _is_numpad(info, vk):
++        """识别小键盘 1/2；NumLock 关时用非 extended 标志排除主键盘 End/↓。"""
++        if info.vkCode != vk:
++            return False
++        # VK_NUMPAD1/2 只可能来自小键盘；部分键盘/远程桌面会带扩展位，不要卡它。
++        if vk in (_NUMPAD_RUN, _NUMPAD_STOP):
++            return True
++        # NumLock 关：小键盘 1/2 变成 End/↓（扫描码 0x4F/0x50，不带扩展位）；
++        # 主键盘导航区的 End/↓ 带 LLKHF_EXTENDED，必须排除。
++        return not (info.flags & 0x01) and info.scanCode in (0x4F, 0x50)
++
++    def _callback(self, nCode, wParam, lParam):
++        try:
++            if nCode >= 0 and wParam in (_WM_KEYDOWN, _WM_KEYUP,
++                                         _WM_SYSKEYDOWN, _WM_SYSKEYUP):
++                info = _ct.cast(lParam, _ct.POINTER(_KBDLLHOOKSTRUCT)).contents
++                act = None
++                if self._is_numpad(info, _NUMPAD_RUN) or self._is_numpad(info, _NUMPAD_END):
++                    act = "run"
++                elif self._is_numpad(info, _NUMPAD_STOP) or self._is_numpad(info, _NUMPAD_DOWN):
++                    act = "stop"
++                if act and wParam in (_WM_KEYDOWN, _WM_SYSKEYDOWN):
++                    # 钩子只发 down 事件；Up 不处理，天然无重复触发
++                    self._fire(act)
++        except Exception as e:
++            log("numpad hook err %s" % e)
++        return _user32.CallNextHookEx(self.hook, nCode, wParam, lParam)
++
++    def _fire(self, act):
++        if act == "run":
++            with _OVERLAY_LOCK:
++                already = (bool(_overlay and _overlay.running) or _OVERLAY_BUSY[0])
++            if already:
++                log("Num1: already running, ignore")
++                return
++            cfg = load_cfg()
++            if not (cfg.get("steps") or []):
++                log("Num1: empty axis, ignore")
++                return
++            log("Num1 -> start overlay (%d steps)" % len(cfg["steps"]))
++            start_overlay(cfg)
++        else:
++            ov = _overlay
++            if ov is not None and getattr(ov, "running", False):
++                log("Num2 -> stop overlay")
++                ov._stop_req = True
++            else:
++                log("Num2: nothing running")
++
++    def run(self):
++        try:
++            self.cb_ref = _HOOKPROC(self._callback)
++            self.hook = _user32.SetWindowsHookExW(
++                _WH_KEYBOARD_LL, self.cb_ref, _kernel32.GetModuleHandleW(None), 0)
++            if not self.hook:
++                log("numpad hook failed err=%d" % _ct.get_last_error())
++                return
++            log("numpad hotkeys ready (Num1=run, Num2=stop, keyboard hook)")
++            msg = _MSG()
++            while not self.stop_req:
++                ret = _user32.GetMessageW(_ct.byref(msg), None, 0, 0)
++                if ret <= 0:
++                    break
++                _user32.TranslateMessage(_ct.byref(msg))
++                _user32.DispatchMessageW(_ct.byref(msg))
++        except Exception as e:
++            log("numpad hook loop err %s" % e)
++        finally:
++            if self.hook:
++                _user32.UnhookWindowsHookEx(self.hook)
++                self.hook = None
++            log("numpad hook stopped")
++
++    def stop(self):
++        self.stop_req = True
++        _user32.PostQuitMessage(0)
++
++
+ # ---------------- HTTP ----------------
+ class Handler(BaseHTTPRequestHandler):
+     protocol_version = "HTTP/1.1"       # 连接复用，避免并发请求时被断开
+@@ -4685,6 +5280,7 @@ def main():
+         log("elevate refused, running without admin (game keys may not be captured)")
+ 
+     log("admin: %s (t=%.2fs)" % (_is_admin(), time.time() - _t0))
++    log("custom patch %s active" % LOCAL_CUSTOM_VERSION)
+ 
+     cfg = load_cfg()
+     save_cfg(cfg)
+@@ -4710,6 +5306,25 @@ def main():
+     log("server on %d" % PORT)
+     threading.Thread(target=_watchdog, daemon=True).start()   # 主窗口没了就自动收摊
+     threading.Thread(target=_track_main_rect, daemon=True).start()   # 记住窗口位置/大小
++
++    # 侧键监听内置在同一个进程里：不用再开 start_remapper.bat / 第二个终端
++    side = None
++    if os.environ.get("ROTPILOT_NO_SIDEHOOK") != "1":
++        def _side_target():
++            ov = _overlay
++            if ov is None or not getattr(ov, "running", False):
++                return ""
++            return getattr(ov, "_side_key", "") or ""
++
++        side = SideKeyHook(_side_target)
++        threading.Thread(target=side.run, daemon=True).start()
++
++    # 小键盘 1/2 = 开始/停止，和侧键一样用钩子，运行条没起也能用
++    np = None
++    if os.environ.get("ROTPILOT_NO_NUMPAD") != "1":
++        np = NumpadHook()
++        threading.Thread(target=np.run, daemon=True).start()
++
+     log("screen mode %s -> #%d" % (cfg.get("screenMode") or "game", pick_screen(cfg)))
+     url = f"http://127.0.0.1:{PORT}/"
+     open_app_window(url)
+@@ -4719,6 +5334,11 @@ def main():
+             time.sleep(1)
+     except KeyboardInterrupt:
+         pass
++    finally:
++        if side is not None:
++            side.stop()
++        if np is not None:
++            np.stop()
+ 
+ 
+ if __name__ == "__main__":

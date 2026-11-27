@@ -1,0 +1,706 @@
+{
+  "keys": {
+    "skill": [
+      "1",
+      "2",
+      "3",
+      "4"
+    ],
+    "ult": [
+      "",
+      "",
+      "",
+      ""
+    ],
+    "link": "E",
+    "exit": "F8",
+    "reset": "F9",
+    "alphaDown": "F6",
+    "alphaUp": "F7",
+    "loopToggle": "F10",
+    "loopJump": "F11"
+  },
+  "inputMode": "kb",
+  "overlayStyle": "focus",
+  "loopCount": 0,
+  "loopFrom": 0,
+  "loopTo": 0,
+  "displayMode": "kb",
+  "comps": [
+    {
+      "name": "提弗洛斯 · 小刻 · 诀（意） · 梨诺",
+      "team": [
+        "提弗洛斯",
+        "小刻",
+        "诀（意）",
+        "梨诺"
+      ]
+    }
+  ],
+  "padType": "ds",
+  "pad": {
+    "modifier": "winmm:B5",
+    "slots": [
+      "winmm:B1",
+      "winmm:B4",
+      "winmm:B3",
+      "winmm:B2"
+    ],
+    "link": "winmm:B6",
+    "exit": "",
+    "reset": ""
+  },
+  "holdMs": 280,
+  "opacity": 0.89,
+  "uiScale": 1,
+  "nextPreview": 0,
+  "autoExit": 1,
+  "demoSeeded": 1,
+  "steps": [
+    {
+      "rep": 1,
+      "link": "rmwy2ix2r5nd",
+      "end": false,
+      "times": -1
+    },
+    {
+      "divider": true,
+      "name": "充能轴1"
+    },
+    {
+      "key": "4",
+      "hold": false,
+      "op": 4,
+      "who": "梨诺",
+      "label": "梨诺 · 战技"
+    },
+    {
+      "key": "2",
+      "hold": false,
+      "op": 2,
+      "who": "小刻",
+      "label": "小刻 · 战技"
+    },
+    {
+      "key": "E",
+      "hold": false,
+      "op": 2,
+      "who": "小刻",
+      "label": "小刻 · 连携技"
+    },
+    {
+      "key": "E",
+      "hold": false,
+      "op": 3,
+      "who": "诀（意）",
+      "label": "诀（意） · 连携技",
+      "note": ""
+    },
+    {
+      "comboWait": true,
+      "op": 2,
+      "who": "小刻"
+    },
+    {
+      "key": "3",
+      "hold": false,
+      "op": 3,
+      "who": "诀（意）",
+      "label": "诀（意） · 战技",
+      "note": ""
+    },
+    {
+      "key": "E",
+      "hold": false,
+      "op": 2,
+      "who": "小刻",
+      "label": "小刻 · 连携技"
+    },
+    {
+      "heavy": true
+    },
+    {
+      "key": "1",
+      "hold": false,
+      "op": 1,
+      "who": "提弗洛斯",
+      "label": "提弗洛斯 · 战技",
+      "note": "飞天射4"
+    },
+    {
+      "key": "E",
+      "hold": false,
+      "op": 1,
+      "who": "提弗洛斯",
+      "label": "提弗洛斯 · 连携技",
+      "note": "4箭射完再按"
+    },
+    {
+      "key": "E",
+      "hold": false,
+      "op": 2,
+      "who": "小刻",
+      "label": "小刻 · 连携技",
+      "note": "亮就按"
+    },
+    {
+      "br": true
+    },
+    {
+      "divider": true,
+      "name": "充能轴2"
+    },
+    {
+      "key": "2",
+      "hold": false,
+      "op": 2,
+      "who": "小刻",
+      "label": "小刻 · 战技",
+      "note": "提丰射5箭再按"
+    },
+    {
+      "key": "E",
+      "hold": false,
+      "op": 2,
+      "who": "小刻",
+      "label": "小刻 · 连携技"
+    },
+    {
+      "key": "E",
+      "hold": false,
+      "op": 3,
+      "who": "诀（意）",
+      "label": "诀（意） · 连携技"
+    },
+    {
+      "key": "E",
+      "hold": false,
+      "op": 4,
+      "who": "梨诺",
+      "label": "梨诺 · 连携技"
+    },
+    {
+      "comboWait": true,
+      "op": 2,
+      "who": "小刻"
+    },
+    {
+      "key": "3",
+      "hold": false,
+      "op": 3,
+      "who": "诀（意）",
+      "label": "诀（意） · 战技",
+      "note": ""
+    },
+    {
+      "key": "E",
+      "hold": false,
+      "op": 2,
+      "who": "小刻",
+      "label": "小刻 · 连携技"
+    },
+    {
+      "key": "E",
+      "hold": false,
+      "op": 1,
+      "who": "提弗洛斯",
+      "label": "提弗洛斯 · 连携技",
+      "note": "等技力够"
+    },
+    {
+      "key": "1",
+      "hold": false,
+      "op": 1,
+      "who": "提弗洛斯",
+      "label": "提弗洛斯 · 战技",
+      "note": "飞天射5"
+    },
+    {
+      "key": "E",
+      "hold": false,
+      "op": 2,
+      "who": "小刻",
+      "label": "小刻 · 连携技",
+      "note": "亮就按"
+    },
+    {
+      "br": true
+    },
+    {
+      "divider": true,
+      "name": "爆发轴"
+    },
+    {
+      "comboWait": true,
+      "op": 1,
+      "who": "提弗洛斯"
+    },
+    {
+      "key": "2",
+      "hold": false,
+      "op": 2,
+      "who": "小刻",
+      "label": "小刻 · 战技",
+      "note": ""
+    },
+    {
+      "key": "E",
+      "hold": false,
+      "op": 1,
+      "who": "提弗洛斯",
+      "label": "提弗洛斯 · 连携技"
+    },
+    {
+      "key": "E",
+      "hold": false,
+      "op": 2,
+      "who": "小刻",
+      "label": "小刻 · 连携技"
+    },
+    {
+      "key": "E",
+      "hold": false,
+      "op": 3,
+      "who": "诀（意）",
+      "label": "诀（意） · 连携技"
+    },
+    {
+      "key": "E",
+      "hold": false,
+      "op": 4,
+      "who": "梨诺",
+      "label": "梨诺 · 连携技"
+    },
+    {
+      "key": "1",
+      "hold": false,
+      "op": 1,
+      "who": "提弗洛斯",
+      "label": "提弗洛斯 · 战技"
+    },
+    {
+      "key": "2",
+      "hold": true,
+      "op": 2,
+      "who": "小刻",
+      "label": "小刻 · 终结技"
+    },
+    {
+      "key": "3",
+      "hold": true,
+      "op": 3,
+      "who": "诀（意）",
+      "label": "诀（意） · 终结技"
+    },
+    {
+      "key": "4",
+      "hold": true,
+      "op": 4,
+      "who": "梨诺",
+      "label": "梨诺 · 终结技"
+    },
+    {
+      "key": "E",
+      "hold": false,
+      "op": 2,
+      "who": "小刻",
+      "label": "小刻 · 连携技",
+      "note": "亮就按"
+    },
+    {
+      "key": "1",
+      "hold": true,
+      "op": 1,
+      "who": "提弗洛斯",
+      "label": "提弗洛斯 · 终结技",
+      "note": "射完5箭后开"
+    },
+    {
+      "key": "3",
+      "hold": false,
+      "op": 3,
+      "who": "诀（意）",
+      "label": "诀（意） · 战技",
+      "note": "射4箭后开"
+    },
+    {
+      "key": "E",
+      "hold": false,
+      "op": 1,
+      "who": "提弗洛斯",
+      "label": "提弗洛斯 · 连携技"
+    },
+    {
+      "key": "E",
+      "hold": false,
+      "op": 2,
+      "who": "小刻",
+      "label": "小刻 · 连携技"
+    },
+    {
+      "key": "E",
+      "hold": false,
+      "op": 3,
+      "who": "诀（意）",
+      "label": "诀（意） · 连携技",
+      "note": "这个打完射5箭"
+    },
+    {
+      "rep": 1,
+      "link": "rmwy2ix2r5nd",
+      "end": true,
+      "times": -1
+    }
+  ],
+  "team": [
+    "提弗洛斯",
+    "小刻",
+    "诀（意）",
+    "梨诺"
+  ],
+  "teams": [
+    {
+      "name": "提弗洛斯+小刻+诀（意）+梨诺 · 11-27 17:22",
+      "team": [
+        "提弗洛斯",
+        "小刻",
+        "诀（意）",
+        "梨诺"
+      ],
+      "steps": [
+        {
+          "rep": 1,
+          "link": "rmwy2ix2r5nd",
+          "end": false,
+          "times": -1
+        },
+        {
+          "divider": true,
+          "name": "充能轴1"
+        },
+        {
+          "key": "4",
+          "hold": false,
+          "op": 4,
+          "who": "梨诺",
+          "label": "梨诺 · 战技"
+        },
+        {
+          "key": "2",
+          "hold": false,
+          "op": 2,
+          "who": "小刻",
+          "label": "小刻 · 战技"
+        },
+        {
+          "key": "E",
+          "hold": false,
+          "op": 2,
+          "who": "小刻",
+          "label": "小刻 · 连携技"
+        },
+        {
+          "key": "E",
+          "hold": false,
+          "op": 3,
+          "who": "诀（意）",
+          "label": "诀（意） · 连携技",
+          "note": ""
+        },
+        {
+          "comboWait": true,
+          "op": 2,
+          "who": "小刻"
+        },
+        {
+          "key": "3",
+          "hold": false,
+          "op": 3,
+          "who": "诀（意）",
+          "label": "诀（意） · 战技",
+          "note": ""
+        },
+        {
+          "key": "E",
+          "hold": false,
+          "op": 2,
+          "who": "小刻",
+          "label": "小刻 · 连携技"
+        },
+        {
+          "heavy": true
+        },
+        {
+          "key": "1",
+          "hold": false,
+          "op": 1,
+          "who": "提弗洛斯",
+          "label": "提弗洛斯 · 战技",
+          "note": "飞天射4"
+        },
+        {
+          "key": "E",
+          "hold": false,
+          "op": 1,
+          "who": "提弗洛斯",
+          "label": "提弗洛斯 · 连携技",
+          "note": "4箭射完再按"
+        },
+        {
+          "key": "E",
+          "hold": false,
+          "op": 2,
+          "who": "小刻",
+          "label": "小刻 · 连携技",
+          "note": "亮就按"
+        },
+        {
+          "br": true
+        },
+        {
+          "divider": true,
+          "name": "充能轴2"
+        },
+        {
+          "key": "2",
+          "hold": false,
+          "op": 2,
+          "who": "小刻",
+          "label": "小刻 · 战技",
+          "note": "提丰射5箭再按"
+        },
+        {
+          "key": "E",
+          "hold": false,
+          "op": 2,
+          "who": "小刻",
+          "label": "小刻 · 连携技"
+        },
+        {
+          "key": "E",
+          "hold": false,
+          "op": 3,
+          "who": "诀（意）",
+          "label": "诀（意） · 连携技"
+        },
+        {
+          "key": "E",
+          "hold": false,
+          "op": 4,
+          "who": "梨诺",
+          "label": "梨诺 · 连携技"
+        },
+        {
+          "comboWait": true,
+          "op": 2,
+          "who": "小刻"
+        },
+        {
+          "key": "3",
+          "hold": false,
+          "op": 3,
+          "who": "诀（意）",
+          "label": "诀（意） · 战技",
+          "note": ""
+        },
+        {
+          "key": "E",
+          "hold": false,
+          "op": 2,
+          "who": "小刻",
+          "label": "小刻 · 连携技"
+        },
+        {
+          "key": "E",
+          "hold": false,
+          "op": 1,
+          "who": "提弗洛斯",
+          "label": "提弗洛斯 · 连携技",
+          "note": "等技力够"
+        },
+        {
+          "key": "1",
+          "hold": false,
+          "op": 1,
+          "who": "提弗洛斯",
+          "label": "提弗洛斯 · 战技",
+          "note": "飞天射5"
+        },
+        {
+          "key": "E",
+          "hold": false,
+          "op": 2,
+          "who": "小刻",
+          "label": "小刻 · 连携技",
+          "note": "亮就按"
+        },
+        {
+          "br": true
+        },
+        {
+          "divider": true,
+          "name": "爆发轴"
+        },
+        {
+          "comboWait": true,
+          "op": 1,
+          "who": "提弗洛斯"
+        },
+        {
+          "key": "2",
+          "hold": false,
+          "op": 2,
+          "who": "小刻",
+          "label": "小刻 · 战技",
+          "note": ""
+        },
+        {
+          "key": "E",
+          "hold": false,
+          "op": 1,
+          "who": "提弗洛斯",
+          "label": "提弗洛斯 · 连携技"
+        },
+        {
+          "key": "E",
+          "hold": false,
+          "op": 2,
+          "who": "小刻",
+          "label": "小刻 · 连携技"
+        },
+        {
+          "key": "E",
+          "hold": false,
+          "op": 3,
+          "who": "诀（意）",
+          "label": "诀（意） · 连携技"
+        },
+        {
+          "key": "E",
+          "hold": false,
+          "op": 4,
+          "who": "梨诺",
+          "label": "梨诺 · 连携技"
+        },
+        {
+          "key": "1",
+          "hold": false,
+          "op": 1,
+          "who": "提弗洛斯",
+          "label": "提弗洛斯 · 战技"
+        },
+        {
+          "key": "2",
+          "hold": true,
+          "op": 2,
+          "who": "小刻",
+          "label": "小刻 · 终结技"
+        },
+        {
+          "key": "3",
+          "hold": true,
+          "op": 3,
+          "who": "诀（意）",
+          "label": "诀（意） · 终结技"
+        },
+        {
+          "key": "4",
+          "hold": true,
+          "op": 4,
+          "who": "梨诺",
+          "label": "梨诺 · 终结技"
+        },
+        {
+          "key": "E",
+          "hold": false,
+          "op": 2,
+          "who": "小刻",
+          "label": "小刻 · 连携技",
+          "note": "亮就按"
+        },
+        {
+          "key": "1",
+          "hold": true,
+          "op": 1,
+          "who": "提弗洛斯",
+          "label": "提弗洛斯 · 终结技",
+          "note": "射完5箭后开"
+        },
+        {
+          "key": "3",
+          "hold": false,
+          "op": 3,
+          "who": "诀（意）",
+          "label": "诀（意） · 战技",
+          "note": "射4箭后开"
+        },
+        {
+          "key": "E",
+          "hold": false,
+          "op": 1,
+          "who": "提弗洛斯",
+          "label": "提弗洛斯 · 连携技"
+        },
+        {
+          "key": "E",
+          "hold": false,
+          "op": 2,
+          "who": "小刻",
+          "label": "小刻 · 连携技"
+        },
+        {
+          "key": "E",
+          "hold": false,
+          "op": 3,
+          "who": "诀（意）",
+          "label": "诀（意） · 连携技",
+          "note": "这个打完射5箭"
+        },
+        {
+          "rep": 1,
+          "link": "rmwy2ix2r5nd",
+          "end": true,
+          "times": -1
+        }
+      ],
+      "holdMs": 280
+    }
+  ],
+  "freshInit": true,
+  "screenMode": "game",
+  "winMax": false,
+  "overlayMonitor": "\\\\.\\DISPLAY1",
+  "winRect": {
+    "x": 0,
+    "y": 34,
+    "w": 1818,
+    "h": 972
+  },
+  "winMonitor": "\\\\.\\DISPLAY1",
+  "iconSize": 60,
+  "recentOps": [
+    "小刻",
+    "明河"
+  ],
+  "opPacks": [
+    {
+      "name": "operators_minghe.zip",
+      "at": "2026-11-27 04:07"
+    }
+  ],
+  "opPack": {
+    "name": "operators_minghe.zip",
+    "at": "2026-11-27 04:07"
+  },
+  "overlayX": 383,
+  "overlayY": 4,
+  "heroX": 609,
+  "heroY": 356,
+  "comboHintOn": 1,
+  "comboHintMode": "WhenReady",
+  "comboHintShowFor": 3.0,
+  "comboHintInterval": 0.5,
+  "comboHintScale": 1.0,
+  "comboHintX": 0.3015625,
+  "comboHintY": 0.549074074074074
+}
