@@ -1940,6 +1940,7 @@ class Overlay:
         # 「等CD」门控的本次进入状态；离开 comboWait 格就清空，避免循环复用旧状态。
         self._cw_key = None
         self._cw_enter = 0.0
+        self._cw_since = 0.0
         self._cw_saw_cooling = False
         self._cw_hold_logged = False
 
@@ -3138,6 +3139,15 @@ class Overlay:
             self._cw_enter = time.monotonic()
             self._cw_saw_cooling = False
             self._cw_hold_logged = False
+            # 关键：进入这一格才清掉之前遗留的旧事件。它们属于上一次连携，
+            # 旧的 take_combo_ready 会直接消费导致 t=0.0s 秒跳（第二个等CD被跳过）。
+            # 判据：本槽位最近一次「按下连携」的时刻 —— 在此之前发布的事件
+            # 都属于上一次连携；没有按下标记时退回进门时刻留 0.25s 容差。
+            used_at = peek_combo_used(op) or 0.0
+            self._cw_since = max(used_at, self._cw_enter - 0.25)
+            n_drop = drop_combo_ready_before(self._cw_since)
+            if n_drop:
+                log("combo wait enter drop %d stale event(s)" % n_drop)
             log("combo wait enter seg=%d step=%d op=%d cd=%s"
                 % (self.seg, self.idx, op, _COMBO_CD.get("slots")))
 
@@ -3163,7 +3173,7 @@ class Overlay:
             self._cw_saw_cooling = True
             return
 
-        ev = take_combo_ready(op)
+        ev = take_combo_ready(op, since=self._cw_since)
         if ev is None and not self._cw_saw_cooling:
             # p 是满的，但从没见过这次冷却：多半是轴开始前就已经就绪，
             # 不满足「收到冷却完成事件才继续」的语义。
@@ -3681,17 +3691,39 @@ def publish_combo_ready(slot: int) -> None:
     log("combo ready event slot=%d" % i)
 
 
-def take_combo_ready(slot: int):
-    """运行条线程调用：取走一条尚未被消费的该槽位冷却完成事件。"""
+def take_combo_ready(slot: int, since: float = 0.0):
+    """运行条线程调用：取走一条尚未被消费的该槽位冷却完成事件。
+
+    since>0 时只认这个时刻之后发布的事件：门控格进入前遗留的旧事件属于
+    上一次连携（18:17:24 发布、18:17:26 进入门控被误用导致第二个等CD跳过），
+    绝不能放行本次门控。
+    """
     try:
         i = int(slot)
     except (TypeError, ValueError):
         return None
     with _COMBO_EVENT_LOCK:
         for n, ev in enumerate(_COMBO_EVENTS):
-            if ev.get("slot") == i:
-                return _COMBO_EVENTS.pop(n)
+            if ev.get("slot") != i:
+                continue
+            if since and float(ev.get("t", 0.0)) < since:
+                continue
+            return _COMBO_EVENTS.pop(n)
     return None
+
+
+def drop_combo_ready_before(since: float) -> int:
+    """清掉进入门控前遗留的旧事件，返回丢弃条数。"""
+    n_drop = 0
+    with _COMBO_EVENT_LOCK:
+        keep = []
+        for ev in _COMBO_EVENTS:
+            if float(ev.get("t", 0.0)) < since:
+                n_drop += 1
+            else:
+                keep.append(ev)
+        _COMBO_EVENTS[:] = keep
+    return n_drop
 
 
 def mark_combo_used(slot) -> None:
