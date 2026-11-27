@@ -4,9 +4,10 @@ config.json.bak*
 web_run.log
 *.log
 
-# Python 缓存
+# Python 缓存（注意：*.pyd 是运行时必需的二进制模块，不能忽略！）
 __pycache__/
-*.py[cod]
+*.pyc
+*.pyo
 
 # 补丁 / 备份目录
 _backup/
